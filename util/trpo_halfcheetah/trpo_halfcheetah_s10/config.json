@@ -1,0 +1,40 @@
+{
+    "ac_kwargs":	{},
+    "actor_critic":	"mlp_actor_critic",
+    "algo":	"trpo",
+    "backtrack_coeff":	0.8,
+    "backtrack_iters":	10,
+    "cg_iters":	10,
+    "damping_coeff":	0.1,
+    "delta":	0.01,
+    "env_fn":	"<function call_experiment.<locals>.thunk_plus.<locals>.<lambda> at 0x7f96a91cd2f0>",
+    "epochs":	250,
+    "exp_name":	"trpo_halfcheetah",
+    "gamma":	0.99,
+    "lam":	0.97,
+    "logger":	{
+        "<spinup.utils.logx.EpochLogger object at 0x7f96a91da7b8>":	{
+            "epoch_dict":	{},
+            "exp_name":	"trpo_halfcheetah",
+            "first_row":	true,
+            "log_current_row":	{},
+            "log_headers":	[],
+            "output_dir":	"/data/ZhangHengrui/spinningup-master/data/trpo_halfcheetah/trpo_halfcheetah_s10",
+            "output_file":	{
+                "<_io.TextIOWrapper name='/data/ZhangHengrui/spinningup-master/data/trpo_halfcheetah/trpo_halfcheetah_s10/progress.txt' mode='w' encoding='UTF-8'>":	{
+                    "mode":	"w"
+                }
+            }
+        }
+    },
+    "logger_kwargs":	{
+        "exp_name":	"trpo_halfcheetah",
+        "output_dir":	"/data/ZhangHengrui/spinningup-master/data/trpo_halfcheetah/trpo_halfcheetah_s10"
+    },
+    "max_ep_len":	1000,
+    "save_freq":	10,
+    "seed":	10,
+    "steps_per_epoch":	4000,
+    "train_v_iters":	80,
+    "vf_lr":	0.001
+}
