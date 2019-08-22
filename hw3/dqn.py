@@ -158,6 +158,15 @@ class QLearner(object):
     # Tip: use huber_loss (from dqn_utils) instead of squared error when defining self.total_error
     ######
 
+    self.q = q_func(obs_t_float, self.num_actions, scope="q_func")
+    target_q = q_func(obs_tp1_float, self.num_actions, scope="target_q_func")
+    next_q = self.rew_t_ph + (1-self.done_mask_ph) * gamma * tf.reduce_max(target_q, 1)
+
+    tf.stop_gradient(next_q)
+
+    q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="q_func")
+    target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_q_func")
+    self.total_error = tf.reduce_mean(huber_loss(self.q[:, self.act_t_ph]-next_q))
     # YOUR CODE HERE
 
     ######
@@ -227,6 +236,25 @@ class QLearner(object):
     # might as well be random, since you haven't trained your net...)
 
     #####
+    self.replay_buffer_idx = self.replay_buffer.store_frame(self.last_obs)
+
+    obs = self.replay_buffer.encode_recent_observation()
+    noise = self.exploration(self.t)
+    if random.random() < noise and not self.model_initialized:
+      a = random.randint(0, self.num_actions-1)
+    else:
+      a = self.session.run(tf.arg_max(self.q, axis=1), dict={self.obs_t_ph: obs})[0]
+
+    obs_,  r, done, _ = self.env.step(a)
+
+    self.replay_buffer.store_effect(self.replay_buffer_idx, a, r, done)
+
+    if done:
+      self.last_obs = self.env.reset()
+
+    else:
+      self.last_obs = obs_
+
 
     # YOUR CODE HERE
 
@@ -274,8 +302,25 @@ class QLearner(object):
       #####
 
       # YOUR CODE HERE
+      obs, a, r, obs_, d = self.replay_buffer.sample(self.batch_size)
+      if not self.model_initialized:
+        initialize_interdependent_variables(self.session, tf.global_variables(), {
+          self.obs_t_ph: obs,
+          self.obs_tp1_ph: obs_
+        })
+
+        self.session.run(self.update_target_fn)
+        self.model_initialized = True
+
+      self.session.run(self.train_fn, feed_dict={self.obs_tp1_ph: obs, self.act_t_ph: a, self.rew_t_ph: r,
+                                                 self.obs_tp1_ph: obs_, self.done_mask_ph: d})
+
+
 
       self.num_param_updates += 1
+
+      if self.num_param_updates % self.target_update_freq == 0:
+        self.session.run(self.update_target_fn)
 
     self.t += 1
 
