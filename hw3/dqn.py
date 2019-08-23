@@ -166,7 +166,10 @@ class QLearner(object):
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="q_func")
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_q_func")
-    self.total_error = tf.reduce_mean(huber_loss(self.q[:, self.act_t_ph]-next_q))
+    action_one_hot = tf.one_hot(self.act_t_ph, self.num_actions)
+    q = tf.reduce_sum(action_one_hot*self.q, axis=1)
+
+    self.total_error = tf.reduce_mean(huber_loss(q-next_q))
     # YOUR CODE HERE
 
     ######
@@ -239,11 +242,11 @@ class QLearner(object):
     self.replay_buffer_idx = self.replay_buffer.store_frame(self.last_obs)
 
     obs = self.replay_buffer.encode_recent_observation()
-    noise = self.exploration(self.t)
-    if random.random() < noise and not self.model_initialized:
+    noise = self.exploration.value(self.t)
+    if random.random() < noise or not self.model_initialized:
       a = random.randint(0, self.num_actions-1)
     else:
-      a = self.session.run(tf.arg_max(self.q, axis=1), dict={self.obs_t_ph: obs})[0]
+      a = self.session.run(tf.math.argmax(self.q, axis=1), feed_dict={self.obs_t_ph: [obs]})[0]
 
     obs_,  r, done, _ = self.env.step(a)
 
@@ -312,8 +315,10 @@ class QLearner(object):
         self.session.run(self.update_target_fn)
         self.model_initialized = True
 
-      self.session.run(self.train_fn, feed_dict={self.obs_tp1_ph: obs, self.act_t_ph: a, self.rew_t_ph: r,
-                                                 self.obs_tp1_ph: obs_, self.done_mask_ph: d})
+      self.session.run(self.train_fn, feed_dict={self.learning_rate: self.optimizer_spec.lr_schedule.value(self.t),
+                                                 self.obs_t_ph: obs, self.act_t_ph: a, self.rew_t_ph: r,
+                                                 self.obs_tp1_ph: obs_, self.done_mask_ph: d,
+                                                 })
 
 
 
