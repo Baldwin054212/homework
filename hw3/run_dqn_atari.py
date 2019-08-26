@@ -2,6 +2,7 @@ import argparse
 import gym
 from gym import wrappers
 import os.path as osp
+import os
 import random
 import numpy as np
 import tensorflow as tf
@@ -99,7 +100,9 @@ def get_session():
     tf_config = tf.ConfigProto(
         inter_op_parallelism_threads=1,
         intra_op_parallelism_threads=1)
+    tf_config.gpu_options.allow_growth = True
     session = tf.Session(config=tf_config)
+
     print("AVAILABLE GPUS: ", get_available_gpus())
     return session
 
@@ -123,8 +126,12 @@ def main():
     seed = random.randint(0, 9999)
     print('random seed = %d' % seed)
     env = get_env(task, seed)
+
     session = get_session()
     atari_learn(env, session, num_timesteps=2e8)
 
 if __name__ == "__main__":
+    #zhr
+    # os.environ["CUDA_VISIBLE_DEVICES"] = str(1)
+    #zhr
     main()
