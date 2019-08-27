@@ -184,7 +184,7 @@ class Agent(object):
             sy_logits_na = policy_parameters
             # YOUR_CODE_HERE
             act_log = tf.nn.log_softmax(sy_logits_na, axis=1)
-            sy_sampled_ac = tf.multinomial(act_log, 1)[0]
+            sy_sampled_ac = tf.squeeze(tf.multinomial(act_log, 1), -1)
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
@@ -274,7 +274,7 @@ class Agent(object):
         #                           ----------PROBLEM 2----------
         # Loss Function and Training Operation
         #========================================================================================#
-        loss = tf.reduce_mean(self.sy_logprob_n*self.sy_adv_n) # YOUR CODE HERE
+        loss = -tf.reduce_mean(self.sy_logprob_n*self.sy_adv_n) # YOUR CODE HERE
         self.update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(loss)
 
         #========================================================================================#
@@ -409,8 +409,8 @@ class Agent(object):
         # YOUR_CODE_HERE
         q_n = []
         if self.reward_to_go:
+            l = 0  # 每条path的起始位置
             for re in re_n:
-                l = 0         #每条path的起始位置
                 q_n.extend([0]*len(re))
                 q = 0
                 for i in range(len(re)-1, -1, -1):
