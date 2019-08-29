@@ -1,4 +1,5 @@
 import json
+import tensorflow as tf
 
 """
 
@@ -42,6 +43,7 @@ def colorize(string, color, bold=False, highlight=False):
 class G:
     output_dir = None
     output_file = None
+    saver_dir = None
     first_row = True
     log_headers = []
     log_current_row = {}
@@ -53,6 +55,11 @@ def configure_output_dir(d=None):
     G.output_dir = d or "/tmp/experiments/%i"%int(time.time())
     assert not osp.exists(G.output_dir), "Log dir %s already exists! Delete it first or use a different dir"%G.output_dir
     os.makedirs(G.output_dir)
+
+    G.saver_dir = osp.join(G.output_dir, "saver")
+    assert not osp.exists(G.saver_dir), "Log dir %s already exists! Delete it first or use a different dir" % G.saver_dir
+    os.makedirs(G.saver_dir)
+
     G.output_file = open(osp.join(G.output_dir, "log.txt"), 'w')
     atexit.register(G.output_file.close)
     print(colorize("Logging data to %s"%G.output_file.name, 'green', bold=True))
@@ -110,3 +117,13 @@ def dump_tabular():
         G.output_file.flush()
     G.log_current_row.clear()
     G.first_row=False
+
+def save_model(sess, step):
+    saver = tf.train.Saver()
+    file = osp.join(G.saver_dir, "step")
+    saver.save(sess, file, global_step=step)
+
+def load_model(sess, step):
+    saver = tf.train.Saver()
+    file = osp.join(G.saver_dir, "step")
+    saver.restore(sess, file)

@@ -31,9 +31,10 @@ def atari_model(img_in, num_actions, scope, reuse=False):
 
 def atari_learn(env,
                 session,
-                num_timesteps):
+                args, logdir):
+
     # This is just a rough estimate
-    num_iterations = float(num_timesteps) / 4.0
+    num_iterations = float(args.num_timesteps) / 4.0
 
     lr_multiplier = 1.0
     lr_schedule = PiecewiseSchedule([
@@ -51,7 +52,7 @@ def atari_learn(env,
     def stopping_criterion(env, t):
         # notice that here t is the number of steps of the wrapped env,
         # which is different from the number of steps in the underlying env
-        return get_wrapper_by_name(env, "Monitor").get_total_steps() >= num_timesteps
+        return get_wrapper_by_name(env, "Monitor").get_total_steps() >= args.num_timesteps
 
     exploration_schedule = PiecewiseSchedule(
         [
@@ -76,7 +77,8 @@ def atari_learn(env,
         frame_history_len=4,
         target_update_freq=10000,
         grad_norm_clipping=10,
-        double_q=True
+        double_q=True,
+        logdir=logdir
     )
     env.close()
 
@@ -120,18 +122,35 @@ def get_env(task, seed):
 
 def main():
     # Get Atari games.
-    task = gym.make('PongNoFrameskip-v4')
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--env_name', type=str, default='SeaquestNoFrameskip-v4')
+    parser.add_argument('--exp_name', type=str, default='dqn')
+    parser.add_argument('--render', action='store_true')
+    parser.add_argument('--batch_size', '-b', type=int, default=32)
+    parser.add_argument('--seed', type=int, default=1)
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--num_timesteps', type=int, default=5e7)
+    args = parser.parse_args()
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
+
+    logdir = args.exp_name + '_' + args.env_name
+    logdir = os.path.join('data', logdir)
+    logdir = osp.join(logdir, "seed"+str(args.seed))
+
+
+    task = gym.make(args.env_name)
 
     # Run training
-    seed = random.randint(0, 9999)
+    seed = args.seed
     print('random seed = %d' % seed)
     env = get_env(task, seed)
 
     session = get_session()
-    atari_learn(env, session, num_timesteps=2e8)
+    atari_learn(env, session, args, logdir)
 
 if __name__ == "__main__":
-    #zhr
-    # os.environ["CUDA_VISIBLE_DEVICES"] = str(1)
-    #zhr
+
     main()

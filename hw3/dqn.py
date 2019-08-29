@@ -10,8 +10,19 @@ import tensorflow                as tf
 import tensorflow.contrib.layers as layers
 from collections import namedtuple
 from dqn_utils import *
+import logz
+import inspect
 
 OptimizerSpec = namedtuple("OptimizerSpec", ["constructor", "kwargs", "lr_schedule"])
+
+
+def setup_logger(logdir, locals_):
+  # Configure output directory for logging
+  logz.configure_output_dir(logdir)
+  # Log experimental parameters
+  args = inspect.getargspec(learn)[0]
+  params = {k: locals_[k] if k in locals_ else None for k in args}
+  logz.save_params(params)
 
 class QLearner(object):
 
@@ -33,7 +44,8 @@ class QLearner(object):
     grad_norm_clipping=10,
     rew_file=None,
     double_q=True,
-    lander=False):
+    lander=False,
+    logdir=None):
     """Run Deep Q-learning algorithm.
 
     You can specify your own convnet using q_func.
@@ -100,6 +112,8 @@ class QLearner(object):
     self.session = session
     self.exploration = exploration
     self.rew_file = str(uuid.uuid4()) + '.pkl' if rew_file is None else rew_file
+    self.logdir = logdir
+
 
     ###############
     # BUILD MODEL #
@@ -162,7 +176,9 @@ class QLearner(object):
     target_q = q_func(obs_tp1_float, self.num_actions, scope="target_q_func")
     next_q = self.rew_t_ph + (1-self.done_mask_ph) * gamma * tf.reduce_max(target_q, 1)
 
-    tf.stop_gradient(next_q)
+    # tf.stop_gradient(next_q)
+    self.best_a = tf.math.argmax(self.q, axis=1)
+
 
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="q_func")
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_q_func")
@@ -201,7 +217,7 @@ class QLearner(object):
     self.last_obs = self.env.reset()
     self.log_every_n_steps = 10000
 
-    self.start_time = None
+    self.start_time = time.time()
     self.t = 0
 
   def stopping_criterion_met(self):
@@ -246,7 +262,7 @@ class QLearner(object):
     if random.random() < noise or not self.model_initialized:
       a = random.randint(0, self.num_actions-1)
     else:
-      a = self.session.run(tf.math.argmax(self.q, axis=1), feed_dict={self.obs_t_ph: [obs]})[0]
+      a = self.session.run(self.best_a, feed_dict={self.obs_t_ph: [obs]})[0]
 
     obs_,  r, done, _ = self.env.step(a)
 
@@ -339,24 +355,36 @@ class QLearner(object):
       self.best_mean_episode_reward = max(self.best_mean_episode_reward, self.mean_episode_reward)
 
     if self.t % self.log_every_n_steps == 0 and self.model_initialized:
-      print("Timestep %d" % (self.t,))
-      print("mean reward (100 episodes) %f" % self.mean_episode_reward)
-      print("best mean reward %f" % self.best_mean_episode_reward)
-      print("episodes %d" % len(episode_rewards))
-      print("exploration %f" % self.exploration.value(self.t))
-      print("learning_rate %f" % self.optimizer_spec.lr_schedule.value(self.t))
-      if self.start_time is not None:
-        print("running time %f" % ((time.time() - self.start_time) / 60.))
+      # print("Timestep %d" % (self.t,))
+      # print("mean reward (100 episodes) %f" % self.mean_episode_reward)
+      # print("best mean reward %f" % self.best_mean_episode_reward)
+      # print("episodes %d" % len(episode_rewards))
+      # print("exploration %f" % self.exploration.value(self.t))
+      # print("learning_rate %f" % self.optimizer_spec.lr_schedule.value(self.t))
+      # if self.start_time is not None:
+      #   print("running time %f" % ((time.time() - self.start_time) / 60.))
+
+      logz.log_tabular('Timestep', self.t)
+      logz.log_tabular('MeanReward100Episodes', self.mean_episode_reward)
+      logz.log_tabular('BestMeanReward', self.best_mean_episode_reward)
+      logz.log_tabular('Episodes', len(episode_rewards))
+      logz.log_tabular('Exploration', self.exploration.value(self.t))
+      logz.log_tabular('LearningRate', self.optimizer_spec.lr_schedule.value(self.t))
+      logz.log_tabular('RunningTime', ((time.time() - self.start_time) / 60.))
+      logz.dump_tabular()
 
       self.start_time = time.time()
 
       sys.stdout.flush()
 
-      with open(self.rew_file, 'wb') as f:
-        pickle.dump(episode_rewards, f, pickle.HIGHEST_PROTOCOL)
+      logz.save_model(self.session, self.t)
+
+      # with open(self.rew_file, 'wb') as f:
+      #   pickle.dump(episode_rewards, f, pickle.HIGHEST_PROTOCOL)
 
 def learn(*args, **kwargs):
   alg = QLearner(*args, **kwargs)
+  setup_logger(alg.logdir, locals())
   while not alg.stopping_criterion_met():
     alg.step_env()
     # at this point, the environment should have been advanced one step (and
