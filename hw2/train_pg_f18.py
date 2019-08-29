@@ -83,7 +83,8 @@ class Agent(object):
         self.normalize_advantages = estimate_return_args['normalize_advantages']
 
     def init_tf_sess(self):
-        tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1) 
+        tf_config = tf.ConfigProto(inter_op_parallelism_threads=1, intra_op_parallelism_threads=1)
+        tf_config.gpu_options.allow_growth = True
         self.sess = tf.Session(config=tf_config)
         self.sess.__enter__() # equivalent to `with self.sess:`
         tf.global_variables_initializer().run() #pylint: disable=E1101
@@ -285,7 +286,6 @@ class Agent(object):
         # neural network baseline. These will be used to fit the neural network baseline. 
         #========================================================================================#
         if self.nn_baseline:
-            raise NotImplementedError
             self.baseline_prediction = tf.squeeze(build_mlp(
                                     self.sy_ob_no, 
                                     1, 
@@ -293,8 +293,8 @@ class Agent(object):
                                     n_layers=self.n_layers,
                                     size=self.size))
             # YOUR_CODE_HERE
-            self.sy_target_n = None
-            baseline_loss = None
+            self.sy_target_n = tf.placeholder(tf.float32, shape=[None, ], name="b_target")
+            baseline_loss = tf.nn.l2_loss(self.baseline_prediction - self.sy_target_n)
             self.baseline_update_op = tf.train.AdamOptimizer(self.learning_rate).minimize(baseline_loss)
 
     def sample_trajectories(self, itr, env):
@@ -427,6 +427,7 @@ class Agent(object):
                     q = q*self.gamma+re[i]
                 q_n.extend([q]*len(re))
 
+        q_n = np.array(q_n)
         return q_n
 
     def compute_advantage(self, ob_no, q_n):
@@ -458,8 +459,8 @@ class Agent(object):
             # Hint #bl1: rescale the output from the nn_baseline to match the statistics
             # (mean and std) of the current batch of Q-values. (Goes with Hint
             # #bl2 in Agent.update_parameters.
-            raise NotImplementedError
-            b_n = None # YOUR CODE HERE
+
+            b_n = self.sess.run(self.baseline_prediction, feed_dict={self.sy_ob_no: ob_no}) # YOUR CODE HERE
             adv_n = q_n - b_n
         else:
             adv_n = q_n.copy()
@@ -493,8 +494,8 @@ class Agent(object):
         if self.normalize_advantages:
             # On the next line, implement a trick which is known empirically to reduce variance
             # in policy gradient methods: normalize adv_n to have mean zero and std=1.
-            raise NotImplementedError
-            adv_n = None # YOUR_CODE_HERE
+
+            adv_n = (adv_n - adv_n.mean()) / adv_n.std() # YOUR_CODE_HERE
         return q_n, adv_n
 
     def update_parameters(self, ob_no, ac_na, q_n, adv_n):
@@ -530,8 +531,9 @@ class Agent(object):
             # Agent.compute_advantage.)
 
             # YOUR_CODE_HERE
-            raise NotImplementedError
-            target_n = None 
+            target_n = (q_n-q_n.mean())/q_n.std()
+            self.sess.run(self.baseline_update_op, feed_dict={self.sy_ob_no: ob_no,
+                                                              self.sy_target_n: target_n})
 
         #====================================================================================#
         #                           ----------PROBLEM 3----------
@@ -669,7 +671,7 @@ def train_PG(
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env_name', type=str, default='CartPole-v1')
+    parser.add_argument('env_name', type=str, default='CartPole-v1')
     parser.add_argument('--exp_name', type=str, default='vpg')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--discount', type=float, default=1.0)
@@ -713,7 +715,7 @@ def main():
                 reward_to_go=args.reward_to_go,
                 animate=args.render,
                 logdir=os.path.join(logdir,'%d'%seed),
-                normalize_advantages=(args.dont_normalize_advantages),
+                normalize_advantages=not(args.dont_normalize_advantages),
                 nn_baseline=args.nn_baseline, 
                 seed=seed,
                 n_layers=args.n_layers,
