@@ -109,13 +109,12 @@ def get_session():
     return session
 
 def get_env(task, seed):
-    env = gym.make('PongNoFrameskip-v4')
 
     set_global_seeds(seed)
-    env.seed(seed)
+    task.seed(seed)
 
     expt_dir = '/tmp/hw3_vid_dir2/'
-    env = wrappers.Monitor(env, osp.join(expt_dir, "gym"), force=True)
+    env = wrappers.Monitor(task, osp.join(expt_dir, "gym"), force=True)
     env = wrap_deepmind(env)
 
     return env

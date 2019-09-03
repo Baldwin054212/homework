@@ -145,12 +145,12 @@ class Agent(object):
 
         if self.discrete:
             # YOUR_CODE_HERE
-            sy_logits_na = build_mlp(sy_ob_no, self.ac_dim, "policy", 2, 64)
+            sy_logits_na = build_mlp(sy_ob_no, self.ac_dim, "policy", self.n_layers, self.size)
             return sy_logits_na
         else:
             # YOUR_CODE_HERE
-            sy_mean = build_mlp(sy_ob_no, self.ac_dim, "policy", 2, 64)
-            sy_logstd = None
+            sy_mean = build_mlp(sy_ob_no, self.ac_dim, "policy", self.n_layers, self.size)
+            sy_logstd = tf.get_variable(name="sy_logstd", shape=[self.ac_dim])
             return (sy_mean, sy_logstd)
 
     #========================================================================================#
@@ -231,10 +231,14 @@ class Agent(object):
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
-            sigma = tf.exp(sy_logstd)
-            pre_sum = -tf.square(sy_ac_na-sy_mean)/(2*tf.square(sigma)) - np.log(np.sqrt(2*np.pi)*sigma)
-
+            # sigma = tf.exp(sy_logstd)
+            # stand_normal = 0.5*tf.square((sy_ac_na - sy_mean)/sigma)
+            # pre_sum = -tf.log(sigma*np.sqrt(2*np.pi)) - stand_normal
+            #
+            # sy_logprob_n = tf.reduce_sum(pre_sum, axis=1)
+            pre_sum = -0.5 * (((sy_ac_na-sy_mean)/(tf.exp(sy_logstd)))**2 + 2*sy_logstd + np.log(2*np.pi))
             sy_logprob_n = tf.reduce_sum(pre_sum, axis=1)
+            # sy_logprob_n = tf.exp(sy_logprob_n)
         return sy_logprob_n
 
     def build_computation_graph(self):
@@ -515,6 +519,7 @@ class Agent(object):
                 nothing
 
         """
+        p, mean, a = self.sess.run([self.sy_logprob_n, self.policy_parameters, self.sy_sampled_ac], feed_dict={self.sy_ob_no: ob_no[0:2], self.sy_ac_na: ac_na[0:2]})
         #====================================================================================#
         #                           ----------PROBLEM 6----------
         # Optimizing Neural Network Baseline
