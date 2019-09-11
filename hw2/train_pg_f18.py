@@ -150,7 +150,7 @@ class Agent(object):
         else:
             # YOUR_CODE_HERE
             sy_mean = build_mlp(sy_ob_no, self.ac_dim, "policy", self.n_layers, self.size)
-            sy_logstd = tf.get_variable(name="sy_logstd", shape=[self.ac_dim])
+            sy_logstd = tf.get_variable(name="sy_logstd", shape=[self.ac_dim], dtype=tf.float32)
             return (sy_mean, sy_logstd)
 
     #========================================================================================#
@@ -189,7 +189,7 @@ class Agent(object):
         else:
             sy_mean, sy_logstd = policy_parameters
             # YOUR_CODE_HERE
-            z = tf.random_normal(shape=tf.shape(sy_mean))
+            z = tf.random_normal(shape=tf.shape(sy_mean), dtype=tf.float32)
             sigma = tf.exp(sy_logstd)
 
             sy_sampled_ac = sy_mean + sigma*z
@@ -238,7 +238,7 @@ class Agent(object):
             # sy_logprob_n = tf.reduce_sum(pre_sum, axis=1)
             pre_sum = -0.5 * (((sy_ac_na-sy_mean)/(tf.exp(sy_logstd)))**2 + 2*sy_logstd + np.log(2*np.pi))
             sy_logprob_n = tf.reduce_sum(pre_sum, axis=1)
-            # sy_logprob_n = tf.exp(sy_logprob_n)
+
         return sy_logprob_n
 
     def build_computation_graph(self):
@@ -431,7 +431,7 @@ class Agent(object):
                     q = q*self.gamma+re[i]
                 q_n.extend([q]*len(re))
 
-        q_n = np.array(q_n)
+        q_n = np.array(q_n, dtype=np.float32)
         return q_n
 
     def compute_advantage(self, ob_no, q_n):
@@ -499,7 +499,8 @@ class Agent(object):
             # On the next line, implement a trick which is known empirically to reduce variance
             # in policy gradient methods: normalize adv_n to have mean zero and std=1.
 
-            adv_n = (adv_n - adv_n.mean()) / adv_n.std() # YOUR_CODE_HERE
+            #adv_n = (adv_n - np.mean(adv_n)) / np.std(adv_n, dtype=np.float64) # YOUR_CODE_HERE
+            adv_n = adv_n - np.sum(adv_n)
         return q_n, adv_n
 
     def update_parameters(self, ob_no, ac_na, q_n, adv_n):
@@ -676,7 +677,7 @@ def train_PG(
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('env_name', type=str, default='CartPole-v1')
+    parser.add_argument('--env_name', type=str, default='CartPole-v0')
     parser.add_argument('--exp_name', type=str, default='vpg')
     parser.add_argument('--render', action='store_true')
     parser.add_argument('--discount', type=float, default=1.0)
